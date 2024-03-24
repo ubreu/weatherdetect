@@ -24,10 +24,6 @@
             enable = true;
           };
 
-          languages.terraform = {
-            enable = true;
-          };
-
           # project specific environment variables or commands/aliases
           env.PROJECT_NAME = "Rain Detect";
           scripts.hello.exec = ''
