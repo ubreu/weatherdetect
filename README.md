@@ -16,3 +16,28 @@ Test the cloud function locally:
 export FUNCTION_TARGET=DetectForLocation
 go run cmd/main.go
 ````
+
+
+## Deployment
+
+Initialize the gcloud CLI (only run once)
+````
+gcloud init
+````
+
+Authorize:
+````
+gcloud auth login
+````
+
+Deploy:
+````
+gcloud functions deploy rain-detect \
+--gen2 \
+--runtime=go122 \
+--region=europe-west6 \
+--source=. \
+--entry-point=DetectForLocation \
+--trigger-http \
+--allow-unauthenticated
+````
