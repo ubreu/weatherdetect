@@ -55,21 +55,21 @@ func DetectForLocation(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		ValuesOfMatchingFeatures := []float64{}
+		AllMatchingFeatures := []Feature{}
 		for _, s := range stations {
 			findFeature := func(f Feature) bool { return strings.EqualFold(f.ID, s) }
-			mapValue := func(f Feature) float64 { return f.Properties.Value }
-			MatchingFeatureValues := Map(Filter(md.Features, findFeature), mapValue)
-			ValuesOfMatchingFeatures = append(ValuesOfMatchingFeatures, MatchingFeatureValues...)
+			MatchingFeatureValues := Filter(md.Features, findFeature)
+			AllMatchingFeatures = append(AllMatchingFeatures, MatchingFeatureValues...)
 		}
-		log.Printf("values for matching features: %+v", ValuesOfMatchingFeatures)
+		log.Printf("values for matching features: %+v", AllMatchingFeatures)
 		var rainDetected = 0
-		for _, v := range ValuesOfMatchingFeatures {
-			if v > 0.0 {
+		for _, f := range AllMatchingFeatures {
+			if f.Properties.Value > 0.0 {
 				rainDetected = 1
 			}
 		}
 		u := DetectionResult{Rain: rainDetected}
+		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(u)
 	}
 }
@@ -81,12 +81,4 @@ func Filter[T any](ss []T, test func(T) bool) (ret []T) {
 		}
 	}
 	return
-}
-
-func Map[T, U any](ts []T, f func(T) U) []U {
-	us := make([]U, len(ts))
-	for i := range ts {
-		us[i] = f(ts[i])
-	}
-	return us
 }
