@@ -64,7 +64,7 @@ func DetectForLocation(w http.ResponseWriter, r *http.Request) {
 		log.Printf("values for matching features: %+v", AllMatchingFeatures)
 		var rainDetected = 0
 		for _, f := range AllMatchingFeatures {
-			if f.Properties.Value > 0.0 {
+			if f.Properties.Value > 0.0 && f.Properties.Value < 1000.0 {
 				rainDetected = 1
 			}
 		}
