@@ -50,15 +50,15 @@ func DetectForLocation(w http.ResponseWriter, r *http.Request) {
 	}
 
 	u := DetectionResult{
-		Rain:     detect(stations, precipitationUrl),
-		Sunshine: detect(stations, sunshineUrl),
+		Rain:     detect(stations, precipitationUrl, 0.0, 1000.0),
+		Sunshine: detect(stations, sunshineUrl, 3.0, 10.0),
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(u)
 }
 
-func detect(stations []string, url string) int {
+func detect(stations []string, url string, lowerRange float64, upperRange float64) int {
 	var detected = 0
 	var md MeteoData
 	res, err := http.Get(url)
@@ -79,7 +79,7 @@ func detect(stations []string, url string) int {
 		}
 		log.Printf("%s values for matching features: %+v", md.Name, AllMatchingFeatures)
 		for _, f := range AllMatchingFeatures {
-			if f.Properties.Value > 4.0 && f.Properties.Value <= 10.0 {
+			if f.Properties.Value > lowerRange && f.Properties.Value <= upperRange {
 				detected = 1
 			}
 		}
