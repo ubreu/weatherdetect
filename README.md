@@ -4,7 +4,7 @@ This is a cloud function which determines whether certain weather features/compo
 
 Detect for a list of the given stations:
 ````
-curl "localhost:8080?station=SMA&station=BRZ&station=KLO&station=WFJ&station=BRT&station=GOS"
+curl https://europe-west6-weather-detect.cloudfunctions.net/weather-detect?station=WAG&station=SMA&station=REH&station=DIT&station=ZWK
 ````
 
 ## Development
@@ -13,6 +13,7 @@ Test the cloud function locally:
 ````
 export FUNCTION_TARGET=DetectForLocation
 go run cmd/main.go
+curl "localhost:8080?station=SMA&station=BRZ&station=KLO&station=WFJ&station=BRT&station=GOS"
 ````
 
 
