@@ -29,6 +29,7 @@ type Feature struct {
 type MeteoData struct {
 	CreationTime string    `json:"creation_time"`
 	Type         string    `json:"type"`
+	Name         string    `json:"map_short_name"`
 	Features     []Feature `json:"features"`
 }
 
@@ -49,18 +50,18 @@ func DetectForLocation(w http.ResponseWriter, r *http.Request) {
 	}
 
 	u := DetectionResult{
-		Rain:     detectRain(stations),
-		Sunshine: detectSunshine(stations),
+		Rain:     detect(stations, precipitationUrl),
+		Sunshine: detect(stations, sunshineUrl),
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(u)
 }
 
-func detectRain(stations []string) int {
+func detect(stations []string, url string) int {
 	var detected = 0
 	var md MeteoData
-	res, err := http.Get(precipitationUrl)
+	res, err := http.Get(url)
 	if err != nil {
 		log.Printf("error making http request: %s\n", err)
 	} else {
@@ -76,36 +77,7 @@ func detectRain(stations []string) int {
 			MatchingFeatureValues := Filter(md.Features, findFeature)
 			AllMatchingFeatures = append(AllMatchingFeatures, MatchingFeatureValues...)
 		}
-		log.Printf("rain values for matching features: %+v", AllMatchingFeatures)
-		for _, f := range AllMatchingFeatures {
-			if f.Properties.Value > 0.0 && f.Properties.Value < 1000.0 {
-				detected = 1
-			}
-		}
-	}
-	return detected
-}
-
-func detectSunshine(stations []string) int {
-	var detected = 0
-	var md MeteoData
-	res, err := http.Get(sunshineUrl)
-	if err != nil {
-		log.Printf("error making http request: %s\n", err)
-	} else {
-		err := json.NewDecoder(res.Body).Decode(&md)
-		if err != nil {
-			log.Printf("error decoding http request: %s\n", err)
-			return 0
-		}
-
-		AllMatchingFeatures := []Feature{}
-		for _, s := range stations {
-			findFeature := func(f Feature) bool { return strings.EqualFold(f.ID, s) }
-			MatchingFeatureValues := Filter(md.Features, findFeature)
-			AllMatchingFeatures = append(AllMatchingFeatures, MatchingFeatureValues...)
-		}
-		log.Printf("sunshine values for matching features: %+v", AllMatchingFeatures)
+		log.Printf("%s values for matching features: %+v", md.Name, AllMatchingFeatures)
 		for _, f := range AllMatchingFeatures {
 			if f.Properties.Value > 4.0 && f.Properties.Value <= 10.0 {
 				detected = 1
