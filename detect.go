@@ -2,13 +2,15 @@ package detect
 
 import (
 	"encoding/json"
-	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
 	"log"
 	"net/http"
 	"strings"
+
+	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
 )
 
 const precipitationUrl string = "https://data.geo.admin.ch/ch.meteoschweiz.messwerte-niederschlag-10min/ch.meteoschweiz.messwerte-niederschlag-10min_en.json"
+const sunshineUrl string = "https://data.geo.admin.ch/ch.meteoschweiz.messwerte-sonnenscheindauer-10min/ch.meteoschweiz.messwerte-sonnenscheindauer-10min_en.json"
 
 // converted using https://mholt.github.io/json-to-go/
 type Feature struct {
@@ -31,7 +33,8 @@ type MeteoData struct {
 }
 
 type DetectionResult struct {
-	Rain int
+	Rain     int
+	Sunshine int
 }
 
 func init() {
@@ -44,6 +47,18 @@ func DetectForLocation(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "missing required station parameter", http.StatusBadRequest)
 		return
 	}
+
+	u := DetectionResult{
+		Rain:     detectRain(stations),
+		Sunshine: detectSunshine(stations),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(u)
+}
+
+func detectRain(stations []string) int {
+	var detected = 0
 	var md MeteoData
 	res, err := http.Get(precipitationUrl)
 	if err != nil {
@@ -51,8 +66,8 @@ func DetectForLocation(w http.ResponseWriter, r *http.Request) {
 	} else {
 		err := json.NewDecoder(res.Body).Decode(&md)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
+			log.Printf("error decoding http request: %s\n", err)
+			return 0
 		}
 
 		AllMatchingFeatures := []Feature{}
@@ -61,17 +76,43 @@ func DetectForLocation(w http.ResponseWriter, r *http.Request) {
 			MatchingFeatureValues := Filter(md.Features, findFeature)
 			AllMatchingFeatures = append(AllMatchingFeatures, MatchingFeatureValues...)
 		}
-		log.Printf("values for matching features: %+v", AllMatchingFeatures)
-		var rainDetected = 0
+		log.Printf("rain values for matching features: %+v", AllMatchingFeatures)
 		for _, f := range AllMatchingFeatures {
 			if f.Properties.Value > 0.0 && f.Properties.Value < 1000.0 {
-				rainDetected = 1
+				detected = 1
 			}
 		}
-		u := DetectionResult{Rain: rainDetected}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(u)
 	}
+	return detected
+}
+
+func detectSunshine(stations []string) int {
+	var detected = 0
+	var md MeteoData
+	res, err := http.Get(sunshineUrl)
+	if err != nil {
+		log.Printf("error making http request: %s\n", err)
+	} else {
+		err := json.NewDecoder(res.Body).Decode(&md)
+		if err != nil {
+			log.Printf("error decoding http request: %s\n", err)
+			return 0
+		}
+
+		AllMatchingFeatures := []Feature{}
+		for _, s := range stations {
+			findFeature := func(f Feature) bool { return strings.EqualFold(f.ID, s) }
+			MatchingFeatureValues := Filter(md.Features, findFeature)
+			AllMatchingFeatures = append(AllMatchingFeatures, MatchingFeatureValues...)
+		}
+		log.Printf("sunshine values for matching features: %+v", AllMatchingFeatures)
+		for _, f := range AllMatchingFeatures {
+			if f.Properties.Value > 4.0 && f.Properties.Value <= 10.0 {
+				detected = 1
+			}
+		}
+	}
+	return detected
 }
 
 func Filter[T any](ss []T, test func(T) bool) (ret []T) {
