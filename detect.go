@@ -5,12 +5,15 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
 )
 
 const precipitationUrl string = "https://data.geo.admin.ch/ch.meteoschweiz.messwerte-niederschlag-10min/ch.meteoschweiz.messwerte-niederschlag-10min_en.json"
 const sunshineUrl string = "https://data.geo.admin.ch/ch.meteoschweiz.messwerte-sonnenscheindauer-10min/ch.meteoschweiz.messwerte-sonnenscheindauer-10min_en.json"
+
+var httpClient = &http.Client{Timeout: 10 * time.Second}
 
 // converted using https://mholt.github.io/json-to-go/
 type Feature struct {
@@ -34,8 +37,8 @@ type MeteoData struct {
 }
 
 type DetectionResult struct {
-	Rain     int
-	Sunshine int
+	Rain     int `json:"rain"`
+	Sunshine int `json:"sunshine"`
 }
 
 func init() {
@@ -55,33 +58,36 @@ func DetectForLocation(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(u)
+	if err := json.NewEncoder(w).Encode(u); err != nil {
+		log.Printf("error encoding response: %s\n", err)
+	}
 }
 
 func detect(stations []string, url string, lowerRange float64, upperRange float64) int {
 	var detected = 0
 	var md MeteoData
-	res, err := http.Get(url)
+	res, err := httpClient.Get(url)
 	if err != nil {
 		log.Printf("error making http request: %s\n", err)
-	} else {
-		err := json.NewDecoder(res.Body).Decode(&md)
-		if err != nil {
-			log.Printf("error decoding http request: %s\n", err)
-			return 0
-		}
+		return 0
+	}
+	defer res.Body.Close()
 
-		AllMatchingFeatures := []Feature{}
-		for _, s := range stations {
-			findFeature := func(f Feature) bool { return strings.EqualFold(f.ID, s) }
-			MatchingFeatureValues := Filter(md.Features, findFeature)
-			AllMatchingFeatures = append(AllMatchingFeatures, MatchingFeatureValues...)
-		}
-		log.Printf("%s values for matching features: %+v", md.Name, AllMatchingFeatures)
-		for _, f := range AllMatchingFeatures {
-			if f.Properties.Value > lowerRange && f.Properties.Value <= upperRange {
-				detected = 1
-			}
+	if err := json.NewDecoder(res.Body).Decode(&md); err != nil {
+		log.Printf("error decoding http request: %s\n", err)
+		return 0
+	}
+
+	allMatchingFeatures := []Feature{}
+	for _, s := range stations {
+		findFeature := func(f Feature) bool { return strings.EqualFold(f.ID, s) }
+		matchingFeatureValues := Filter(md.Features, findFeature)
+		allMatchingFeatures = append(allMatchingFeatures, matchingFeatureValues...)
+	}
+	log.Printf("%s values for matching features: %+v", md.Name, allMatchingFeatures)
+	for _, f := range allMatchingFeatures {
+		if f.Properties.Value > lowerRange && f.Properties.Value <= upperRange {
+			detected = 1
 		}
 	}
 	return detected
